@@ -1,0 +1,53 @@
+on: [push]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: 'Checkout Github Action' 
+      uses: actions/checkout@master
+    
+    - name: 'Login via Azure CLI'
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    
+    - uses: azure/docker-login@v1
+      with:
+        login-server: test55registry.azurecr.io
+        username: ${{ secrets.acr_test55registry_username }}
+        password: ${{ secrets.acr_test55registry_password }}
+    
+    - name: Build and push image to ACR
+      id: build-image
+      run: |
+        docker build "$GITHUB_WORKSPACE/react/mohit-garg/docer-app" -f  "react/mohit-garg/docer-app/Dockerfile" -t test55registry.azurecr.io/testreactwebapp55-img:${{ github.sha }}
+        docker push test55registry.azurecr.io/testreactwebapp55-img:${{ github.sha }}
+
+    - name: Set Web App ACR authentication
+      uses: Azure/appservice-settings@v1
+      with: 
+        app-name: testreactwebapp55
+        app-settings-json: | 
+          [
+            {
+              "name": "DOCKER_REGISTRY_SERVER_URL",
+              "value": "test55registry.azurecr.io",
+              "slotSetting": false
+            },
+            {
+              "name": "DOCKER_REGISTRY_SERVER_USERNAME",
+              "value": "${{ secrets.acr_test55registry_username }}",
+              "slotSetting": false
+            },
+            {
+              "name": "DOCKER_REGISTRY_SERVER_PASSWORD",
+              "value": "${{ secrets.acr_test55registry_password }}",
+              "slotSetting": false
+            }            
+          ]
+      
+    - uses: azure/webapps-deploy@v2
+      with:
+        app-name: testreactwebapp55
+        images: test55registry.azurecr.io/testreactwebapp55-img:${{ github.sha }}
